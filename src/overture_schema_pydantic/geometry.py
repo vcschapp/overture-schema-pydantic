@@ -11,6 +11,8 @@ from pydantic_core import core_schema, InitErrorDetails
 from shapely.geometry import shape, mapping
 from shapely.geometry.base import BaseGeometry
 
+# Note: It would be better to model this as a string enumeration class GeometryType(Enum, str)
+#       and then you get GeometryType(str) with a ValueError on unrecognized type as a freebie.
 _GEOMETRY_TYPES = (
     "GeometryCollection",
     "LineString",

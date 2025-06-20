@@ -1,9 +1,10 @@
 from overture_schema_pydantic.geometry import Geometry
 from overture_schema_pydantic.id import Id
+from overture_schema_pydantic.source import Source
 
 from abc import ABC
 from enum import Enum
-from typing import Annotated, Any
+from typing import Annotated, Any, List
 
 from pydantic import Field, GetCoreSchemaHandler, BaseModel
 from pydantic_core import core_schema
@@ -30,7 +31,7 @@ FeatureType = Annotated[
 
 class FeatureTypeReference:
     def __init__(self, feature_type: FeatureType):
-        self.__feature_type = feature_type # TODO: Validate this
+        self.__feature_type = feature_type  # TODO: Validate this
 
     @property
     def feature_type(self) -> FeatureType:
@@ -49,5 +50,9 @@ class FeatureTypeReference:
 
 class Feature(BaseModel, ABC):
     id: Id
-    type: FeatureType
     geometry: Geometry
+    type: FeatureType
+    # TODO: should we scrap `theme` or keep it?
+    # TODO: version
+    # TODO: implement UniqueItems constraint annotation
+    sources: Annotated[List[Source], Field(min_length=1)]

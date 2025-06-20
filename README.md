@@ -10,3 +10,9 @@ POC goals
 8) Annotate `int` type with a "hard range" annotation for Parquet.
 9) Figure out how this would propagate through Spark into Parquet file.
 10) Generate a Spark schema.
+
+Some observations of base types needed:
+
+- A non-empty string type that has no leading or trailing whitespace.
+- A floating-point number [0,1] representing a percentage, used for both
+  confidence and linear referencing.
