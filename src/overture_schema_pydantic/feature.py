@@ -1,34 +1,36 @@
+from overture_schema_pydantic.geometry import Geometry
 from overture_schema_pydantic.id import Id
 
 from abc import ABC
 from enum import Enum
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import GetCoreSchemaHandler, BaseModel
+from pydantic import Field, GetCoreSchemaHandler, BaseModel
 from pydantic_core import core_schema
 
 
-class FeatureType(str, Enum):
-    ADDRESS = "address"
-    BATHYMETRY = "bathymetry"
-    BUILDING = "building"
-    BUILDING_PART = "building_part"
-    CONNECTOR = "connector"
-    DIVISION = "division"
-    DIVISION_AREA = "division_area"
-    DIVISION_BOUNDARY = "division_boundary"
-    INFRASTRUCTURE = "infrastructure"
-    LAND = "land"
-    LAND_COVER = "land_cover"
-    LAND_USE = "land_use"
-    PLACE = "place"
-    SEGMENT = "segment"
-    WATER = "water"
+"""
+The category or type of a feature.
+
+NOTE: I started having this be a string enum, but if we want the core
+      Overture schema model package to support arbitrary extension to
+      new feature types, I think we want to introduce the concept of
+      Overture feature types at this level.
+"""
+FeatureType = Annotated[
+    str,
+    Field(
+        min_length=1,
+        max_length=32,
+        pattern=r"^^[a-z][a-z0-9_]*$",
+        description="The category or type of feature",
+    ),
+]
 
 
 class FeatureTypeReference:
     def __init__(self, feature_type: FeatureType):
-        self.__feature_type = FeatureType(feature_type)
+        self.__feature_type = feature_type # TODO: Validate this
 
     @property
     def feature_type(self) -> FeatureType:
@@ -47,3 +49,5 @@ class FeatureTypeReference:
 
 class Feature(BaseModel, ABC):
     id: Id
+    type: FeatureType
+    geometry: Geometry
