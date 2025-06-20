@@ -1,6 +1,11 @@
 from typing import Any
 
-from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler, ValidationError, ValidationInfo
+from pydantic import (
+    GetCoreSchemaHandler,
+    GetJsonSchemaHandler,
+    ValidationError,
+    ValidationInfo,
+)
 from pydantic_core import core_schema, InitErrorDetails
 
 from shapely.geometry import shape, mapping
@@ -16,6 +21,7 @@ _GEOMETRY_TYPES = (
     "MultiPolygon",
 )
 
+
 class GeometryTypeConstraint:
     def __init__(self, *allowed_types: str):
         self.__allowed_types = self.__class__._validate_geometry_types(allowed_types)
@@ -24,44 +30,56 @@ class GeometryTypeConstraint:
     def allowed_types(self) -> tuple[str, ...]:
         return self.__allowed_types
 
-    def validate(self, value: 'Geometry', info: ValidationInfo):
+    def validate(self, value: "Geometry", info: ValidationInfo):
         geometry_type = value.geom.geom_type
         if geometry_type not in self.allowed_types:
             context = info.context or {}
-            loc = context.get('loc_prefix', ()) + ('value',)
+            loc = context.get("loc_prefix", ()) + ("value",)
             raise ValidationError.from_exception_data(
                 title=self.__class__.__name__,
                 line_errors=[
                     InitErrorDetails(
-                        type = 'value_error',
-                        loc = loc,
+                        type="value_error",
+                        loc=loc,
                         input=value,
-                        ctx={'error': f"geometry type not allowed: {repr(geometry_type)} (allowed values: {repr(self.allowed_types)})"}
+                        ctx={
+                            "error": f"geometry type not allowed: {repr(geometry_type)} (allowed values: {repr(self.allowed_types)})"
+                        },
                     )
-                ]
+                ],
             )
 
     @classmethod
     def _validate_geometry_types(cls, a: list[str]) -> tuple[str]:
         if not a:
-            raise ValueError(f"allowed_types is empty (it must contain at least one of: {_GEOMETRY_TYPES})")
+            raise ValueError(
+                f"allowed_types is empty (it must contain at least one of: {_GEOMETRY_TYPES})"
+            )
 
         if not all(item in _GEOMETRY_TYPES for item in a):
             invalid = [item for item in a if item not in _GEOMETRY_TYPES]
-            raise ValueError(f"allowed_types contains invalid values: {invalid} (allowed: {_GEOMETRY_TYPES})")
+            raise ValueError(
+                f"allowed_types contains invalid values: {invalid} (allowed: {_GEOMETRY_TYPES})"
+            )
 
         if len(set(a)) != len(a):
             raise ValueError(f"allowed_types contains duplicate(s)")
 
         return tuple(sorted(a))
 
-    def __get_pydantic_core_schema__(self, source: type[Any], handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
+    def __get_pydantic_core_schema__(
+        self, source: type[Any], handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
         if not issubclass(source, Geometry):
-            raise TypeError(f"GeometryTypeConstraint can only be applied to {Geometry.__name__}; but it was applied to {source.__name__}")
+            raise TypeError(
+                f"GeometryTypeConstraint can only be applied to {Geometry.__name__}; but it was applied to {source.__name__}"
+            )
         schema = handler(source)
         return core_schema.with_info_after_validator_function(self.validate, schema)
 
+
 _ALL_GEOMETRY_ALLOWED = GeometryTypeConstraint(*_GEOMETRY_TYPES)
+
 
 class Geometry:
     geom: BaseGeometry
@@ -85,73 +103,87 @@ class Geometry:
         return mapping(self.geom)
 
     @classmethod
-    def from_geo_json(cls, value: Any) -> 'Geometry':
+    def from_geo_json(cls, value: Any) -> "Geometry":
         if not isinstance(value, dict):
-            raise TypeError(f"value must be a dict; but {repr(value)} has type {type(value).__name__}")
+            raise TypeError(
+                f"value must be a dict; but {repr(value)} has type {type(value).__name__}"
+            )
 
         type_ = value.get("type")
 
         if type_ not in _GEOMETRY_TYPES:
-            raise ValueError(f"allowed_types contains invalid value {repr(type_)} (allowed: {_GEOMETRY_TYPES})")
+            raise ValueError(
+                f"allowed_types contains invalid value {repr(type_)} (allowed: {_GEOMETRY_TYPES})"
+            )
 
         return cls(shape(value))
 
     @classmethod
-    def __get_pydantic_core_schema__(cls, _source_type: Any, _handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
+    def __get_pydantic_core_schema__(
+        cls, _source_type: Any, _handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
         def validator(value: Any, info: ValidationInfo) -> Geometry:
             try:
                 return cls.from_geo_json(value)
             except Exception as e:
                 context = info.context or {}
-                loc = context.get('loc_prefix', ()) + ('value',)
+                loc = context.get("loc_prefix", ()) + ("value",)
                 raise ValidationError.from_exception_data(
                     title=cls.__name__,
                     line_errors=[
                         InitErrorDetails(
-                            type = 'value_error',
-                            loc = loc,
+                            type="value_error",
+                            loc=loc,
                             input=value,
-                            ctx={'error': f"invalid geometry value: {str(e)}"}
+                            ctx={"error": f"invalid geometry value: {str(e)}"},
                         )
-                    ]
+                    ],
                 )
 
         return core_schema.with_info_plain_validator_function(
             validator,
-            serialization=core_schema.plain_serializer_function_ser_schema(lambda v: v.to_geojson()),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda v: v.to_geojson()
+            ),
         )
 
     @classmethod
     def __get_pydantic_json_schema__(
         cls, core_schema: core_schema.CoreSchema, _handler: GetJsonSchemaHandler
     ) -> dict[str, Any]:
-        geometry_type_constraint = core_schema.get('metadata')['GeometryTypeConstraint']
+        geometry_type_constraint = core_schema.get("metadata")["GeometryTypeConstraint"]
 
         if len(geometry_type_constraint.allowed_types) == 1:
             return _GEOMETRY_JSON_SCHEMA[geometry_type_constraint.allowed_types[1]]
         else:
-            allowed_schemas = tuple(map(lambda x: _GEOMETRY_JSON_SCHEMA[x], geometry_type_constraint.allowed_types))
+            allowed_schemas = tuple(
+                map(
+                    lambda x: _GEOMETRY_JSON_SCHEMA[x],
+                    geometry_type_constraint.allowed_types,
+                )
+            )
             return {
-                'oneOf': allowed_schemas,
+                "oneOf": allowed_schemas,
             }
+
 
 ########################################################################
 # JSON Schema primitives for GeoJSON geometry
 ########################################################################
 
 _BBOX_JSON_SCHEMA = {
-    'type': 'array',
-    'minItems': 4,
-    'items': {
-        'type': 'number',
+    "type": "array",
+    "minItems": 4,
+    "items": {
+        "type": "number",
     },
 }
 
 _POINT_COORDINATES_JSON_SCHEMA = {
-    'type': 'array',
-    'minItems': 2,
-    'items': {
-        type: 'number',
+    "type": "array",
+    "minItems": 2,
+    "items": {
+        type: "number",
     },
 }
 
@@ -160,39 +192,39 @@ _POINT_COORDINATES_JSON_SCHEMA = {
 ########################################################################
 
 _LINE_STRING_COORDINATES_JSON_SCHEMA = {
-    'type': 'array',
-    'minItems': 2,
-    'items': _POINT_COORDINATES_JSON_SCHEMA,
+    "type": "array",
+    "minItems": 2,
+    "items": _POINT_COORDINATES_JSON_SCHEMA,
 }
 
 _MULTI_LINE_STRING_COORDINATES_JSON_SCHEMA = {
-    'type': 'array',
-    'minItems': 1,
-    'items': _LINE_STRING_COORDINATES_JSON_SCHEMA,
+    "type": "array",
+    "minItems": 1,
+    "items": _LINE_STRING_COORDINATES_JSON_SCHEMA,
 }
 
 _MULTI_POINT_COORDINATES_JSON_SCHEMA = {
-    'type': 'array',
-    'minItems': 1,
-    'items': _POINT_COORDINATES_JSON_SCHEMA,
+    "type": "array",
+    "minItems": 1,
+    "items": _POINT_COORDINATES_JSON_SCHEMA,
 }
 
 _LINEAR_RING_COORDINATES_JSON_SCHEMA = {
-    'type': 'array',
-    'minItems': 4,
-    'items': _POINT_COORDINATES_JSON_SCHEMA,
+    "type": "array",
+    "minItems": 4,
+    "items": _POINT_COORDINATES_JSON_SCHEMA,
 }
 
 _POLYGON_COORDINATES_JSON_SCHEMA = {
-    'type': 'array',
-    'minItems': 1,
-    'items': _LINEAR_RING_COORDINATES_JSON_SCHEMA,
+    "type": "array",
+    "minItems": 1,
+    "items": _LINEAR_RING_COORDINATES_JSON_SCHEMA,
 }
 
 _MULTI_POLYGON_COORDINATES_JSON_SCHEMA = {
-    'type': 'array',
-    'minItems': 1,
-    'items': _POLYGON_COORDINATES_JSON_SCHEMA,
+    "type": "array",
+    "minItems": 1,
+    "items": _POLYGON_COORDINATES_JSON_SCHEMA,
 }
 
 ########################################################################
@@ -200,57 +232,57 @@ _MULTI_POLYGON_COORDINATES_JSON_SCHEMA = {
 ########################################################################
 
 _LINE_STRING_GEOMETRY_JSON_SCHEMA = {
-    'type': {
-        'type': 'string',
-        'enum': ('LineString'),
+    "type": {
+        "type": "string",
+        "enum": ("LineString"),
     },
-    'coordinates': _LINE_STRING_COORDINATES_JSON_SCHEMA,
-    'bbox': _BBOX_JSON_SCHEMA,
+    "coordinates": _LINE_STRING_COORDINATES_JSON_SCHEMA,
+    "bbox": _BBOX_JSON_SCHEMA,
 }
 
 _POINT_GEOMETRY_JSON_SCHEMA = {
-    'type': {
-        'type': 'string',
-        'enum': ('Point'),
+    "type": {
+        "type": "string",
+        "enum": ("Point"),
     },
-    'coordinates': _POINT_COORDINATES_JSON_SCHEMA,
-    'bbox': _BBOX_JSON_SCHEMA,
+    "coordinates": _POINT_COORDINATES_JSON_SCHEMA,
+    "bbox": _BBOX_JSON_SCHEMA,
 }
 
 _POLYGON_GEOMETRY_JSON_SCHEMA = {
-    'type': {
-        'type': 'string',
-        'enum': ('Polygon'),
+    "type": {
+        "type": "string",
+        "enum": ("Polygon"),
     },
-    'coordinates': _POLYGON_COORDINATES_JSON_SCHEMA,
-    'bbox': _BBOX_JSON_SCHEMA,
+    "coordinates": _POLYGON_COORDINATES_JSON_SCHEMA,
+    "bbox": _BBOX_JSON_SCHEMA,
 }
 
 _MULTI_LINE_STRING_GEOMETRY_JSON_SCHEMA = {
-    'type': {
-        'type': 'string',
-        'enum': ('MultiLineString'),
+    "type": {
+        "type": "string",
+        "enum": ("MultiLineString"),
     },
-    'coordinates': _MULTI_LINE_STRING_COORDINATES_JSON_SCHEMA,
-    'bbox': _BBOX_JSON_SCHEMA,
+    "coordinates": _MULTI_LINE_STRING_COORDINATES_JSON_SCHEMA,
+    "bbox": _BBOX_JSON_SCHEMA,
 }
 
 _MULTI_POINT_GEOMETRY_JSON_SCHEMA = {
-    'type': {
-        'type': 'string',
-        'enum': ('MultiPoint'),
+    "type": {
+        "type": "string",
+        "enum": ("MultiPoint"),
     },
-    'coordinates': _MULTI_POINT_COORDINATES_JSON_SCHEMA,
-    'bbox': _BBOX_JSON_SCHEMA,
+    "coordinates": _MULTI_POINT_COORDINATES_JSON_SCHEMA,
+    "bbox": _BBOX_JSON_SCHEMA,
 }
 
 _MULTI_POLYGON_GEOMETRY_JSON_SCHEMA = {
-    'type': {
-        'type': 'string',
-        'enum': ('MultiPolygon'),
+    "type": {
+        "type": "string",
+        "enum": ("MultiPolygon"),
     },
-    'coordinates': _MULTI_POLYGON_COORDINATES_JSON_SCHEMA,
-    'bbox': _BBOX_JSON_SCHEMA,
+    "coordinates": _MULTI_POLYGON_COORDINATES_JSON_SCHEMA,
+    "bbox": _BBOX_JSON_SCHEMA,
 }
 
 ########################################################################
@@ -258,12 +290,12 @@ _MULTI_POLYGON_GEOMETRY_JSON_SCHEMA = {
 ########################################################################
 
 _GEOMETRY_COLLECTION_JSON_SCHEMA = {
-    'type': {
-        'type': 'string',
-        'enum': ('MultiPolygon'),
+    "type": {
+        "type": "string",
+        "enum": ("MultiPolygon"),
     },
-    'geometries': {
-        'oneOf': (
+    "geometries": {
+        "oneOf": (
             _LINE_STRING_GEOMETRY_JSON_SCHEMA,
             _POINT_GEOMETRY_JSON_SCHEMA,
             _POLYGON_GEOMETRY_JSON_SCHEMA,
@@ -272,7 +304,7 @@ _GEOMETRY_COLLECTION_JSON_SCHEMA = {
             _MULTI_POLYGON_GEOMETRY_JSON_SCHEMA,
         )
     },
-    'bbox': _BBOX_JSON_SCHEMA,
+    "bbox": _BBOX_JSON_SCHEMA,
 }
 
 ########################################################################
@@ -280,11 +312,11 @@ _GEOMETRY_COLLECTION_JSON_SCHEMA = {
 ########################################################################
 
 _GEOMETRY_JSON_SCHEMA = {
-    'GeometryCollection': _GEOMETRY_COLLECTION_JSON_SCHEMA,
-    'LineString': _LINE_STRING_GEOMETRY_JSON_SCHEMA,
-    'Point': _POINT_GEOMETRY_JSON_SCHEMA,
-    'Polygon': _POLYGON_GEOMETRY_JSON_SCHEMA,
-    'MultiLineString': _MULTI_LINE_STRING_GEOMETRY_JSON_SCHEMA,
-    'MultiPoint': _MULTI_POINT_GEOMETRY_JSON_SCHEMA,
-    'MultiPolygon': _MULTI_POLYGON_GEOMETRY_JSON_SCHEMA,
+    "GeometryCollection": _GEOMETRY_COLLECTION_JSON_SCHEMA,
+    "LineString": _LINE_STRING_GEOMETRY_JSON_SCHEMA,
+    "Point": _POINT_GEOMETRY_JSON_SCHEMA,
+    "Polygon": _POLYGON_GEOMETRY_JSON_SCHEMA,
+    "MultiLineString": _MULTI_LINE_STRING_GEOMETRY_JSON_SCHEMA,
+    "MultiPoint": _MULTI_POINT_GEOMETRY_JSON_SCHEMA,
+    "MultiPolygon": _MULTI_POLYGON_GEOMETRY_JSON_SCHEMA,
 }
