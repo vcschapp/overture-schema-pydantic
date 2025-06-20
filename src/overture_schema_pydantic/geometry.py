@@ -1,7 +1,7 @@
-from typing import Annotated, Any, Tuple, get_args, get_origin
+from typing import Any
 
-from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler, Field, BaseModel
-from pydantic_core import core_schema
+from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler, ValidationError, ValidationInfo
+from pydantic_core import core_schema, InitErrorDetails
 
 from shapely.geometry import shape, mapping
 from shapely.geometry.base import BaseGeometry
@@ -24,11 +24,22 @@ class GeometryTypeConstraint:
     def allowed_types(self) -> tuple[str, ...]:
         return self.__allowed_types
 
-    def validate(self, value: 'Geometry'):
+    def validate(self, value: 'Geometry', info: ValidationInfo):
         geometry_type = value.geom.geom_type
         if geometry_type not in self.allowed_types:
-            raise ValueError('geometry type not allowed: {repr(geometry_type)} (allowed values: {repr(geometry_type_constraint.allowed_values)})')
-
+            context = info.context or {}
+            loc = context.get('loc_prefix', ()) + ('value',)
+            raise ValidationError.from_exception_data(
+                title=self.__class__.__name__,
+                line_errors=[
+                    InitErrorDetails(
+                        type = 'value_error',
+                        loc = loc,
+                        input=value,
+                        ctx={'error': f"geometry type not allowed: {repr(geometry_type)} (allowed values: {repr(self.allowed_types)})"}
+                    )
+                ]
+            )
 
     @classmethod
     def _validate_geometry_types(cls, a: list[str]) -> tuple[str]:
@@ -45,10 +56,10 @@ class GeometryTypeConstraint:
         return tuple(sorted(a))
 
     def __get_pydantic_core_schema__(self, source: type[Any], handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
-        if not source is Geometry:
-            raise TypeError(f"GeometryTypeConstraint can only be applied to Geometry; but it was applied to {source.__name__}")
+        if not issubclass(source, Geometry):
+            raise TypeError(f"GeometryTypeConstraint can only be applied to {Geometry.__name__}; but it was applied to {source.__name__}")
         schema = handler(source)
-        return core_schema.no_info_after_validator_function(self.validate, schema)
+        return core_schema.with_info_after_validator_function(self.validate, schema)
 
 _ALL_GEOMETRY_ALLOWED = GeometryTypeConstraint(*_GEOMETRY_TYPES)
 
@@ -87,10 +98,25 @@ class Geometry:
 
     @classmethod
     def __get_pydantic_core_schema__(cls, _source_type: Any, _handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
-        def validator(value: Any) -> Geometry:
-            return cls.from_geo_json(value)
+        def validator(value: Any, info: ValidationInfo) -> Geometry:
+            try:
+                return cls.from_geo_json(value)
+            except Exception as e:
+                context = info.context or {}
+                loc = context.get('loc_prefix', ()) + ('value',)
+                raise ValidationError.from_exception_data(
+                    title=cls.__name__,
+                    line_errors=[
+                        InitErrorDetails(
+                            type = 'value_error',
+                            loc = loc,
+                            input=value,
+                            ctx={'error': f"invalid geometry value: {str(e)}"}
+                        )
+                    ]
+                )
 
-        return core_schema.no_info_plain_validator_function(
+        return core_schema.with_info_plain_validator_function(
             validator,
             serialization=core_schema.plain_serializer_function_ser_schema(lambda v: v.to_geojson()),
         )

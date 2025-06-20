@@ -18,7 +18,6 @@ def test_blank():
     with pytest.raises(ValidationError):
         DummyModel(id=" ")
 
-
 def test_whitespace():
     with pytest.raises(ValidationError):
         DummyModel(id=" foo ")
