@@ -72,7 +72,7 @@ class GeometryTypeConstraint:
     ) -> core_schema.CoreSchema:
         if not issubclass(source, Geometry):
             raise TypeError(
-                f"GeometryTypeConstraint can only be applied to {Geometry.__name__}; but it was applied to {source.__name__}"
+                f"{GeometryTypeConstraint.__name__} can only be applied to {Geometry.__name__}; but it was applied to {source.__name__}"
             )
         schema = handler(source)
         return core_schema.with_info_after_validator_function(self.validate, schema)
