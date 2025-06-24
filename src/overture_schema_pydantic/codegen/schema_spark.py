@@ -7,12 +7,15 @@ from overture_schema_pydantic.geometry import Geometry
 from pydantic import BaseModel
 
 import libcst as cst
+import black
 
 
 def generate_code(model: type[BaseModel]) -> str:
     expr = pydantic_model_to_spark_type(model)
     module = cst.Module(body=[cst.SimpleStatementLine([cst.Expr(expr)])])
-    return module.code
+    raw_code = module.code
+    pretty_code = black.format_str(raw_code, mode=black.Mode())
+    return pretty_code
 
 
 def pydantic_model_to_spark_type(model: type[BaseModel]) -> cst.BaseExpression:
