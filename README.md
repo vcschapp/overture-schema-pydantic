@@ -20,18 +20,6 @@ Some observations of base types needed:
   can just declare the field type to be `set`/`Set` and this will
   generate the right `uniqeItems` constraint in JSON Schema.
 
-ISSUES:
-
-- Pydantic has some problems translating regular expressions to JSON Schema.
-  An example of a problematic one is the current "no leading/trailing whitespace regex"
-  for `Id`, which is `pattern=r"^(\S.*)?\S$"` but Pydantic is mangling into
-  ^(\\\\S.*)?\\\\S$, which I think means it is doubling the number of slashes
-  required. (JSON requires `\` to escape `\` so literal `\` becomes `\\`, but
-  Pydantic seems to have doubled that.)
-- A possible workaround is to override `__get_pydantic_json_schema__` where
-  needed.
-
-
 CODE GENERATION:
 
 - Python has a native AST manipulation module, `ast`. This would be good for
