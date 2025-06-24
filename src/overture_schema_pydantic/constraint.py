@@ -3,6 +3,7 @@ from collections.abc import Collection
 from typing import get_origin, Any
 
 from pydantic import (
+    BaseModel,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
     ValidationError,
@@ -16,7 +17,6 @@ class CollectionConstraint(ABC):
     def __get_pydantic_core_schema__(
         self, source: type[Any], handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        origin = get_origin(source)
         if not CollectionConstraint.__is_collection_type__(source):
             raise TypeError(
                 f"{type(self).__name__} can only be applied to collections; but it was applied to {source.__name__}"
@@ -24,16 +24,17 @@ class CollectionConstraint(ABC):
         return handler(source)
 
     @staticmethod
-    def __is_collection_type__(tp: type[Any]) -> bool:
-        origin = get_origin(tp)
+    def __is_collection_type__(source: type[Any]) -> bool:
+        origin = get_origin(source)
         if origin is not None:
             return issubclass(origin, Collection)
         else:
-            return issubclass(tp, Collection)
+            return issubclass(source, Collection)
 
 
 class MinItems(CollectionConstraint):
     def __init__(self, min_items: int):
+        super().__init__()
         if not isinstance(min_items, int):
             raise ValueError(
                 f"`min_items` must be an `int` but it is a `{type(min_items).__name__}`"
@@ -82,4 +83,41 @@ class MinItems(CollectionConstraint):
         elif schema_type == "object":
             json_schema["minProperties"] = self.min_items
 
+        return json_schema
+
+
+class ObjectConstraint(ABC):
+    @abstractmethod
+    def __get_pydantic_core_schema__(
+        self, source: type[Any], handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        if not ObjectConstraint.__is_object_type__(source):
+            raise TypeError(
+                f"{type(self).__name__} can only be applied to objects; but it was applied to {source.__name__}"
+            )
+        return handler(source)
+
+    @staticmethod
+    def __is_object_type__(source: type[Any]) -> bool:
+        origin = get_origin(source)
+        if origin is not None:
+            return issubclass(origin, (dict, BaseModel))
+        else:
+            return issubclass(source, (dict, BaseModel))
+
+
+class NoAdditionalProperties(ObjectConstraint):
+    def __init__(self):
+        super().__init__()
+
+    def __get_pydantic_core_schema__(
+        self, source: type[Any], handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return super().__get_pydantic_core_schema__(source, handler)
+
+    def __get_pydantic_json_schema__(
+        self, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> dict[str, Any]:
+        json_schema = handler(core_schema)
+        json_schema["additionalProperties"] = False
         return json_schema
