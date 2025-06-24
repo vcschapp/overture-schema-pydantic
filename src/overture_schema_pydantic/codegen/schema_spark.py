@@ -1,6 +1,6 @@
 import datetime
 import sys
-from typing import get_args, get_origin, Dict, List, Literal, Tuple, Union
+from typing import get_args, get_origin, Annotated, Dict, List, Literal, Tuple, Union
 
 from overture_schema_pydantic.geometry import Geometry
 
@@ -46,6 +46,9 @@ def python_type_to_spark_type(py_type: type) -> cst.BaseExpression:
     origin = get_origin(py_type)
     args = get_args(py_type)
 
+    if origin is Annotated and len(args) >= 1:
+        return python_type_to_spark_type(args[0])
+
     if origin is Union and type(None) in args:
         non_none = [a for a in args if a is not type(None)]
         if len(non_none) == 1:
@@ -59,8 +62,10 @@ def python_type_to_spark_type(py_type: type) -> cst.BaseExpression:
 
     if origin in (dict, Dict):
         k, v = args
-        if k is not str:
-            raise TypeError("Spark MapType only supports string keys")
+        if not issubclass(k, str):
+            raise TypeError(
+                f"Spark MapType only supports string keys, but the key type for `{repr(py_type)}` is {repr(k)}"
+            )
         return cst.Call(
             func=cst.Name("MapType"),
             args=[
@@ -94,4 +99,5 @@ def python_type_to_spark_type(py_type: type) -> cst.BaseExpression:
     if py_type in primitive_mapping:
         return cst.Call(func=cst.Name(primitive_mapping[py_type]), args=[])
 
-    raise TypeError(f"Unsupported type: {py_type}")
+    # TODO: This is dying on the `Annotated` values.
+    raise TypeError(f"Unsupported type: {py_type}, origin={origin}")
