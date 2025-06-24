@@ -6,7 +6,7 @@ from overture_schema_pydantic.source import Source
 from abc import ABC
 from typing import Annotated, Any, List, Optional
 
-from pydantic import Field, GetCoreSchemaHandler, BaseModel
+from pydantic import BaseModel, Field, GetCoreSchemaHandler, GetJsonSchemaHandler
 from pydantic_core import core_schema
 
 
@@ -57,3 +57,45 @@ class Feature(BaseModel, ABC):
     # TODO: implement UniqueItems constraint annotation
     sources: Annotated[List[Source], Field(min_length=1)]
     names: Optional[Names] = None
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> dict[str, Any]:
+        # Modify the JSON Schema to validate as a GeoJSON feature.
+        json_schema = handler(core_schema)
+
+        # Move all non-GeoJSON properties down into the GeoJSON `properties` object.
+        json_schema_top_level_required = json_schema.get("required", {})
+        json_schema_top_level_properties = json_schema["properties"]
+        geo_json_properties = {}
+        geo_json_required = []
+        for name in list(json_schema_top_level_properties.keys()):
+            if name not in ["id", "geometry"]:
+                value = json_schema_top_level_properties[name]
+                geo_json_properties[name] = value
+                del json_schema_top_level_properties[name]
+                if name in json_schema_top_level_required:
+                    json_schema_top_level_required.remove(name)
+                    geo_json_required.append(name)
+        geo_json_properties_schema = {
+            "type": "object",
+            "properties": geo_json_properties,
+            "required": geo_json_required,
+        }
+        json_schema_top_level_properties["properties"] = {
+            k: v for k, v in geo_json_properties_schema.items() if v
+        }
+        json_schema_top_level_required.append("properties")
+
+        # Add the `"type": "Feature"` GeoJSON property at the top level.
+        json_schema_top_level_properties["type"] = {
+            "type": "string",
+            "const": "Feature",
+        }
+        json_schema_top_level_required.append("type")
+
+        # TODO: Special handling for bbox.
+
+        # Done modifying to GeoJSON.
+        return json_schema

@@ -74,8 +74,6 @@ class MinItems(CollectionConstraint):
     def __get_pydantic_json_schema__(
         self, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
     ) -> dict[str, Any]:
-        print(f"GETTING JSON SCHEMA min_items={self.min_items}")
-
         json_schema = handler(core_schema)
 
         schema_type = json_schema.get("type")

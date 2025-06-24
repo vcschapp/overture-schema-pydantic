@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import (
     GetCoreSchemaHandler,
@@ -193,7 +193,7 @@ _POINT_COORDINATES_JSON_SCHEMA = {
 }
 
 ########################################################################
-# JSON Schema for GeoJSON geometry `coordiates`
+# JSON Schema for GeoJSON geometry `coordinates`
 ########################################################################
 
 _LINE_STRING_COORDINATES_JSON_SCHEMA = {
@@ -236,70 +236,60 @@ _MULTI_POLYGON_COORDINATES_JSON_SCHEMA = {
 # JSON Schema for GeoJSON geometry types
 ########################################################################
 
-_LINE_STRING_GEOMETRY_JSON_SCHEMA = {
-    "type": {
-        "type": "string",
-        "enum": ("LineString"),
-    },
-    "coordinates": _LINE_STRING_COORDINATES_JSON_SCHEMA,
-    "bbox": _BBOX_JSON_SCHEMA,
-}
 
-_POINT_GEOMETRY_JSON_SCHEMA = {
-    "type": {
-        "type": "string",
-        "enum": ("Point"),
-    },
-    "coordinates": _POINT_COORDINATES_JSON_SCHEMA,
-    "bbox": _BBOX_JSON_SCHEMA,
-}
+def geometry_json_schema(
+    geometry_type: str,
+    coordinates: Optional[dict[str, Any]] = None,
+    geometries: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    properties = {
+        "type": {
+            "type": "string",
+            "const": geometry_type,
+        },
+        "bbox": _BBOX_JSON_SCHEMA,
+    }
+    required = ["type"]
+    if coordinates:
+        required.append("coordinates")
+        properties["coordinates"] = coordinates
+    if geometries:
+        required.append("geometries")
+        properties["geometries"] = geometries
+    return {
+        "type": "object",
+        "required": required,
+        "properties": properties,
+    }
 
-_POLYGON_GEOMETRY_JSON_SCHEMA = {
-    "type": {
-        "type": "string",
-        "enum": ("Polygon"),
-    },
-    "coordinates": _POLYGON_COORDINATES_JSON_SCHEMA,
-    "bbox": _BBOX_JSON_SCHEMA,
-}
 
-_MULTI_LINE_STRING_GEOMETRY_JSON_SCHEMA = {
-    "type": {
-        "type": "string",
-        "enum": ("MultiLineString"),
-    },
-    "coordinates": _MULTI_LINE_STRING_COORDINATES_JSON_SCHEMA,
-    "bbox": _BBOX_JSON_SCHEMA,
-}
+_LINE_STRING_GEOMETRY_JSON_SCHEMA = geometry_json_schema(
+    "LineString", coordinates=_LINE_STRING_COORDINATES_JSON_SCHEMA
+)
 
-_MULTI_POINT_GEOMETRY_JSON_SCHEMA = {
-    "type": {
-        "type": "string",
-        "enum": ("MultiPoint"),
-    },
-    "coordinates": _MULTI_POINT_COORDINATES_JSON_SCHEMA,
-    "bbox": _BBOX_JSON_SCHEMA,
-}
+_POINT_GEOMETRY_JSON_SCHEMA = geometry_json_schema(
+    "Point", coordinates=_POINT_COORDINATES_JSON_SCHEMA
+)
 
-_MULTI_POLYGON_GEOMETRY_JSON_SCHEMA = {
-    "type": {
-        "type": "string",
-        "enum": ("MultiPolygon"),
-    },
-    "coordinates": _MULTI_POLYGON_COORDINATES_JSON_SCHEMA,
-    "bbox": _BBOX_JSON_SCHEMA,
-}
+_POLYGON_GEOMETRY_JSON_SCHEMA = geometry_json_schema(
+    "Polygon", coordinates=_POLYGON_COORDINATES_JSON_SCHEMA
+)
 
-########################################################################
-# JSON Schema for GeometryCollection
-########################################################################
+_MULTI_LINE_STRING_GEOMETRY_JSON_SCHEMA = geometry_json_schema(
+    "MultiLineString", coordinates=_MULTI_LINE_STRING_COORDINATES_JSON_SCHEMA
+)
 
-_GEOMETRY_COLLECTION_JSON_SCHEMA = {
-    "type": {
-        "type": "string",
-        "enum": ("MultiPolygon"),
-    },
-    "geometries": {
+_MULTI_POINT_GEOMETRY_JSON_SCHEMA = geometry_json_schema(
+    "MultiPoint", coordinates=_MULTI_POINT_COORDINATES_JSON_SCHEMA
+)
+
+_MULTI_POLYGON_GEOMETRY_JSON_SCHEMA = geometry_json_schema(
+    "MultiPolygon", coordinates=_MULTI_POLYGON_COORDINATES_JSON_SCHEMA
+)
+
+_GEOMETRY_COLLECTION_JSON_SCHEMA = geometry_json_schema(
+    "GeometryCollection",
+    geometries={
         "oneOf": (
             _LINE_STRING_GEOMETRY_JSON_SCHEMA,
             _POINT_GEOMETRY_JSON_SCHEMA,
@@ -309,8 +299,7 @@ _GEOMETRY_COLLECTION_JSON_SCHEMA = {
             _MULTI_POLYGON_GEOMETRY_JSON_SCHEMA,
         )
     },
-    "bbox": _BBOX_JSON_SCHEMA,
-}
+)
 
 ########################################################################
 # Lookup table for all the JSON Schema
