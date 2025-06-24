@@ -266,7 +266,9 @@ def generate_validation_column_function(
 
     # TODO placeholder comment for continuing validation
     todo_comment = cst.EmptyLine(
-        comment = cst.Comment("# TODO: continue with null and other validation checks here")
+        comment=cst.Comment(
+            "# TODO: continue with null and other validation checks here"
+        )
     )
 
     # Return an empty array at end to satisfy function signature (can be removed later)

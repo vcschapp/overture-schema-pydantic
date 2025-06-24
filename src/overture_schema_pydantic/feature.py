@@ -1,10 +1,10 @@
 from overture_schema_pydantic.geometry import Geometry
 from overture_schema_pydantic.id import Id
+from overture_schema_pydantic.names import Names
 from overture_schema_pydantic.source import Source
 
 from abc import ABC
-from enum import Enum
-from typing import Annotated, Any, List
+from typing import Annotated, Any, List, Optional
 
 from pydantic import Field, GetCoreSchemaHandler, BaseModel
 from pydantic_core import core_schema
@@ -23,7 +23,7 @@ FeatureType = Annotated[
     Field(
         min_length=1,
         max_length=32,
-        pattern=r"^^[a-z][a-z0-9_]*$",
+        pattern=r"^[a-z][a-z0-9_]*$",
         description="The category or type of feature",
     ),
 ]
@@ -56,3 +56,4 @@ class Feature(BaseModel, ABC):
     # TODO: version
     # TODO: implement UniqueItems constraint annotation
     sources: Annotated[List[Source], Field(min_length=1)]
+    names: Optional[Names] = None

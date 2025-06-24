@@ -79,6 +79,22 @@ class GeometryTypeConstraint:
         schema = handler(source)
         return core_schema.with_info_after_validator_function(self.validate, schema)
 
+    def __get_pydantic_json_schema__(
+        self, source: type[Any], handler: GetJsonSchemaHandler
+    ) -> dict[str, Any]:
+        if len(self.allowed_types) == 1:
+            return _GEOMETRY_JSON_SCHEMA[self.allowed_types[0]]
+        else:
+            allowed_schemas = tuple(
+                map(
+                    lambda x: _GEOMETRY_JSON_SCHEMA[x],
+                    self.allowed_types,
+                )
+            )
+            return {
+                "oneOf": allowed_schemas,
+            }
+
 
 _ALL_GEOMETRY_ALLOWED = GeometryTypeConstraint(*_GEOMETRY_TYPES)
 
@@ -151,22 +167,9 @@ class Geometry:
 
     @classmethod
     def __get_pydantic_json_schema__(
-        cls, core_schema: core_schema.CoreSchema, _handler: GetJsonSchemaHandler
+        cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
     ) -> dict[str, Any]:
-        geometry_type_constraint = core_schema.get("metadata")["GeometryTypeConstraint"]
-
-        if len(geometry_type_constraint.allowed_types) == 1:
-            return _GEOMETRY_JSON_SCHEMA[geometry_type_constraint.allowed_types[1]]
-        else:
-            allowed_schemas = tuple(
-                map(
-                    lambda x: _GEOMETRY_JSON_SCHEMA[x],
-                    geometry_type_constraint.allowed_types,
-                )
-            )
-            return {
-                "oneOf": allowed_schemas,
-            }
+        return _ALL_GEOMETRY_ALLOWED.__get_pydantic_json_schema__(core_schema, handler)
 
 
 ########################################################################
@@ -185,7 +188,7 @@ _POINT_COORDINATES_JSON_SCHEMA = {
     "type": "array",
     "minItems": 2,
     "items": {
-        type: "number",
+        "type": "number",
     },
 }
 

@@ -1,6 +1,7 @@
 from overture_schema_pydantic.feature import Feature
 
 import copy
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 import pytest
@@ -28,11 +29,42 @@ VALID_STARTING_POINT = {
             "confidence": 1,
         },
     ),
+    "names": {
+        "primary": "foo",
+    },
 }
 
 
 def test_valid():
     m = DummyFeature(**VALID_STARTING_POINT)
+
+    assert m.id == "foo"
+    assert m.type == "bar"
+    assert m.geometry.geom.geom_type == "Point"
+    assert len(m.sources) == 2
+    assert m.sources[0].property == ""
+    assert m.sources[0].dataset == "foo"
+    assert m.sources[0].record_id is None
+    assert m.sources[0].update_time is None
+    assert m.sources[0].confidence is None
+    assert m.sources[1].property == "bar"
+    assert m.sources[1].dataset == "baz"
+    assert m.sources[1].record_id == "qux"
+    assert m.sources[1].update_time == datetime(
+        2025, 6, 20, 16, 44, 1, tzinfo=timezone(timedelta(hours=-8))
+    )
+    assert m.sources[1].confidence == 1
+    assert m.names.primary == "foo"
+
+
+def test_valid_remove_optional():
+    optional = ["names"]
+
+    d = copy.deepcopy(VALID_STARTING_POINT)
+    for o in optional:
+        del d[o]
+
+    m = DummyFeature(**d)
 
     assert m.id == "foo"
     assert m.type == "bar"
@@ -78,6 +110,12 @@ def set_key(d: dict, k: Any, v: Any) -> None:
         (
             "sources_item_dataset_missing",
             lambda d: set_key(d, "sources", ({"property": "foo"},)),
+        ),
+        ("names_primary_missing", lambda d: delete_key(d["names"], "primary")),
+        ("names_common_empty", lambda d: set_key(d["names"], "common", {})),
+        (
+            "names_common_invalid_language_tag",
+            lambda d: set_key(d["names"], "common", {"!foo": "bar"}),
         ),
     ],
 )
