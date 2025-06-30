@@ -14,7 +14,6 @@ dependencies = [
     "geopandas (>=1.1.0,<2.0.0)",
     "libcst (>=1.8.2,<2.0.0)",
     "black (>=25.1.0,<26.0.0)",
-    "pydantic-to-typescript (>=2.0.0,<3.0.0)",
 ]
 
 [tool.poetry]
@@ -32,3 +31,4 @@ testpaths = ["tests"]
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
